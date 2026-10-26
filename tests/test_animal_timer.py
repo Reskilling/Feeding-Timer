@@ -27,13 +27,13 @@ class NextResetTimeTest(unittest.TestCase):
 
 class FormatCountdownTest(unittest.TestCase):
     def test_formats_hours_minutes_seconds(self):
-        self.assertEqual(format_countdown(timedelta(hours=1, minutes=2, seconds=3)), "01:02:03")
+        self.assertEqual(format_countdown(timedelta(hours=1, minutes=2, seconds=3)), "Next meal in 01:02:03")
 
     def test_does_not_wrap_past_a_day(self):
-        self.assertEqual(format_countdown(timedelta(hours=25)), "25:00:00")
+        self.assertEqual(format_countdown(timedelta(hours=25)), "Next meal in 25:00:00")
 
     def test_zero(self):
-        self.assertEqual(format_countdown(timedelta(0)), "00:00:00")
+        self.assertEqual(format_countdown(timedelta(0)), "Next meal in 00:00:00")
 
 
 if __name__ == "__main__":
