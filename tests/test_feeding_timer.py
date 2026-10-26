@@ -2,11 +2,11 @@ import os
 import sys
 import tempfile
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from feeding_timer import FeedingLog, format_clock_time, format_countdown, next_reset_time
+from feeding_timer import FeedingLog, format_clock_time, format_countdown, is_feeding_current, next_reset_time
 
 
 class NextResetTimeTest(unittest.TestCase):
@@ -24,6 +24,21 @@ class NextResetTimeTest(unittest.TestCase):
     def test_after_evening_resets_at_next_morning(self):
         self.assert_next_reset(datetime(2026, 10, 26, 16, 30), datetime(2026, 10, 27, 6, 0))
         self.assert_next_reset(datetime(2026, 12, 31, 23, 59), datetime(2027, 1, 1, 6, 0))
+
+
+class IsFeedingCurrentTest(unittest.TestCase):
+    def test_current_until_next_reset(self):
+        fed_at = datetime(2026, 10, 26, 7, 0)
+        self.assertTrue(is_feeding_current(fed_at, datetime(2026, 10, 26, 16, 29, 59)))
+        self.assertFalse(is_feeding_current(fed_at, datetime(2026, 10, 26, 16, 30)))
+
+    def test_evening_feeding_lasts_overnight(self):
+        fed_at = datetime(2026, 10, 26, 18, 0)
+        self.assertTrue(is_feeding_current(fed_at, datetime(2026, 10, 27, 5, 59)))
+        self.assertFalse(is_feeding_current(fed_at, datetime(2026, 10, 27, 6, 0)))
+
+    def test_feeding_in_the_future_is_not_current(self):
+        self.assertFalse(is_feeding_current(datetime(2026, 10, 27, 7, 0), datetime(2026, 10, 26, 7, 0)))
 
 
 class FormatCountdownTest(unittest.TestCase):
@@ -66,6 +81,17 @@ class FeedingLogTest(unittest.TestCase):
         with open(self.log.path, "w") as file:
             file.write("not json")
         self.assertIsNone(self.log.load_fed_at())
+
+    def test_timezone_aware_record_loads_as_local_time(self):
+        os.makedirs(os.path.dirname(self.log.path))
+        with open(self.log.path, "w") as file:
+            file.write('{"fed_at": "2026-10-26T07:05:00+00:00"}')
+        expected = datetime(2026, 10, 26, 7, 5, tzinfo=timezone.utc).astimezone().replace(tzinfo=None)
+        self.assertEqual(self.log.load_fed_at(), expected)
+
+    def test_save_leaves_no_temp_file(self):
+        self.log.save_fed_at(datetime(2026, 10, 26, 7, 5))
+        self.assertEqual(os.listdir(os.path.dirname(self.log.path)), ["state.json"])
 
     def test_clear_forgets_feeding_and_tolerates_missing_file(self):
         self.log.save_fed_at(datetime(2026, 10, 26, 7, 5))

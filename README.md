@@ -77,9 +77,9 @@ The countdown ends at the next feeding window:
 
 The app remembers the last feeding, so closing it or restarting your computer
 doesn't reset the countdown. On Windows, the feeding is saved in
-`%APPDATA%\Feeding-Timer\state.json`; on other systems, it's saved in
-`~/Feeding-Timer/state.json`. Tapping **Undo** or reaching the end of the
-countdown clears it.
+`%APPDATA%\Feeding-Timer\state.json`; on Linux and macOS, it's saved in
+`~/.local/share/Feeding-Timer/state.json`. Tapping **Undo** deletes the saved
+feeding.
 
 ## Use fullscreen mode
 

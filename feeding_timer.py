@@ -68,7 +68,7 @@ def resource_path(relative_path):
 
 
 def state_file_path():
-    data_dir = os.environ.get("APPDATA") or os.path.expanduser("~")
+    data_dir = os.environ.get("APPDATA") or os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
     return os.path.join(data_dir, AppConfig.APP_TITLE, "state.json")
 
 
@@ -123,6 +123,11 @@ def next_reset_time(now):
     return reset_time_morning + timedelta(days=1)
 
 
+def is_feeding_current(fed_at, now):
+    """A feeding counts until the next reset after it; one stamped in the future (clock change) doesn't count."""
+    return fed_at <= now < next_reset_time(fed_at)
+
+
 def format_countdown(remaining_time):
     hours, remainder = divmod(int(remaining_time.total_seconds()), 3600)
     minutes, seconds = divmod(remainder, 60)
@@ -141,6 +146,7 @@ class MealCountdown:
         self.pending_tick = None
 
     def start(self, end_time):
+        self.cancel()
         self.tick(end_time)
 
     def cancel(self):
@@ -161,7 +167,8 @@ class MealCountdown:
 class FeedingLog:
     """Remembers the last feeding on disk so a restart doesn't forget it.
 
-    Saving is best-effort: if the file can't be written, the app keeps working for the current session.
+    The record is only removed by clear(); an expired feeding is left in place and simply isn't current.
+    save_fed_at and clear raise OSError so the caller can tell the user the record may be stale.
     """
 
     def __init__(self, path):
@@ -170,22 +177,24 @@ class FeedingLog:
     def load_fed_at(self):
         try:
             with open(self.path, encoding="utf-8") as file:
-                return datetime.fromisoformat(json.load(file)["fed_at"])
+                fed_at = datetime.fromisoformat(json.load(file)["fed_at"])
         except (OSError, ValueError, KeyError, TypeError):
             return None
+        if fed_at.tzinfo is not None:
+            fed_at = fed_at.astimezone().replace(tzinfo=None)
+        return fed_at
 
     def save_fed_at(self, fed_at):
-        try:
-            os.makedirs(os.path.dirname(self.path), exist_ok=True)
-            with open(self.path, "w", encoding="utf-8") as file:
-                json.dump({"fed_at": fed_at.isoformat()}, file)
-        except OSError:
-            pass
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        temp_path = self.path + ".tmp"
+        with open(temp_path, "w", encoding="utf-8") as file:
+            json.dump({"fed_at": fed_at.isoformat()}, file)
+        os.replace(temp_path, self.path)
 
     def clear(self):
         try:
             os.remove(self.path)
-        except OSError:
+        except FileNotFoundError:
             pass
 
 
@@ -235,15 +244,14 @@ class FeedingTimerApp:
         self.not_fed_items = (self.bowl_hint, self.bowl_button)
         self.fed_items = (self.countdown_label, self.countdown_text, self.fed_at_text, self.undo_button)
 
-        self.countdown = MealCountdown(self.canvas, on_tick=self.show_remaining_time, on_finished=self.on_countdown_finished)
+        self.countdown = MealCountdown(self.canvas, on_tick=self.show_remaining_time, on_finished=self.show_not_fed)
         self.root.bind("<Escape>", self.on_escape)
 
     def restore_last_feeding(self):
         fed_at = self.feeding_log.load_fed_at()
-        if fed_at is not None and next_reset_time(fed_at) > datetime.now():
+        if fed_at is not None and is_feeding_current(fed_at, datetime.now()):
             self.start_fed(fed_at)
         else:
-            self.feeding_log.clear()
             self.show_not_fed()
 
     def start_fed(self, fed_at):
@@ -268,17 +276,24 @@ class FeedingTimerApp:
 
     def on_bowl_click(self, event):
         fed_at = datetime.now()
-        self.feeding_log.save_fed_at(fed_at)
         self.start_fed(fed_at)
+        try:
+            self.feeding_log.save_fed_at(fed_at)
+        except OSError as e:
+            self.warn_feeding_log_failed("save", e)
 
     def on_undo_click(self, event):
         self.countdown.cancel()
-        self.feeding_log.clear()
         self.show_not_fed()
+        try:
+            self.feeding_log.clear()
+        except OSError as e:
+            self.warn_feeding_log_failed("clear", e)
 
-    def on_countdown_finished(self):
-        self.feeding_log.clear()
-        self.show_not_fed()
+    def warn_feeding_log_failed(self, action, error):
+        messagebox.showwarning(AppConfig.APP_TITLE,
+                               f"Couldn't {action} the feeding record:\n{error}\n\n"
+                               "The timer still works, but it may show the wrong state after a restart.")
 
     def on_fullscreen_click(self, event):
         self.set_fullscreen(not self.root.attributes('-fullscreen'))
