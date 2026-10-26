@@ -1,11 +1,12 @@
 import os
 import sys
+import tempfile
 import unittest
 from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from feeding_timer import format_clock_time, format_countdown, next_reset_time
+from feeding_timer import FeedingLog, format_clock_time, format_countdown, next_reset_time
 
 
 class NextResetTimeTest(unittest.TestCase):
@@ -42,6 +43,35 @@ class FormatClockTimeTest(unittest.TestCase):
 
     def test_afternoon_uses_pm(self):
         self.assertEqual(format_clock_time(datetime(2026, 10, 26, 16, 30)), "4:30 PM")
+
+
+class FeedingLogTest(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.log = FeedingLog(os.path.join(self.temp_dir.name, "nested", "state.json"))
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_remembers_saved_feeding(self):
+        fed_at = datetime(2026, 10, 26, 7, 5, 30)
+        self.log.save_fed_at(fed_at)
+        self.assertEqual(self.log.load_fed_at(), fed_at)
+
+    def test_missing_file_means_no_feeding(self):
+        self.assertIsNone(self.log.load_fed_at())
+
+    def test_corrupt_file_means_no_feeding(self):
+        os.makedirs(os.path.dirname(self.log.path))
+        with open(self.log.path, "w") as file:
+            file.write("not json")
+        self.assertIsNone(self.log.load_fed_at())
+
+    def test_clear_forgets_feeding_and_tolerates_missing_file(self):
+        self.log.save_fed_at(datetime(2026, 10, 26, 7, 5))
+        self.log.clear()
+        self.log.clear()
+        self.assertIsNone(self.log.load_fed_at())
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import tkinter as tk
@@ -24,8 +25,8 @@ class AppConfig:
     PET_NAME = "Jake"
     BACKGROUND_IMAGE_PATH = "assets/background.png"
     BOWL_IMAGE_PATH = "assets/bowl.gif"
-    FULLSCREEN_IMAGE_PATH_OPEN = "assets/fullscreen_open.gif"
-    FULLSCREEN_IMAGE_PATH_CLOSE = "assets/fullscreen_close.gif"
+    FULLSCREEN_IMAGE_PATH_OPEN = "assets/fullscreen_open.png"
+    FULLSCREEN_IMAGE_PATH_CLOSE = "assets/fullscreen_close.png"
     FONT_PATH = "assets/fonts/Nunito.ttf"
     WINDOW_SIZE = (800, 480)
     RESET_TIME_MORNING = (6, 0)
@@ -51,6 +52,7 @@ class Layout:
     COUNTDOWN_Y = 116
     DETAIL_Y = 196
     INLINE_GAP = 16
+    ICON_INSET = 8
 
 
 NOT_FED_TITLE = f"Time to feed {AppConfig.PET_NAME}"
@@ -63,6 +65,11 @@ UNDO_LABEL = "Undo"
 def resource_path(relative_path):
     base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base_path, relative_path)
+
+
+def state_file_path():
+    data_dir = os.environ.get("APPDATA") or os.path.expanduser("~")
+    return os.path.join(data_dir, AppConfig.APP_TITLE, "state.json")
 
 
 def exit_with_missing_asset(path, error):
@@ -151,13 +158,45 @@ class MealCountdown:
             self.on_finished()
 
 
+class FeedingLog:
+    """Remembers the last feeding on disk so a restart doesn't forget it.
+
+    Saving is best-effort: if the file can't be written, the app keeps working for the current session.
+    """
+
+    def __init__(self, path):
+        self.path = path
+
+    def load_fed_at(self):
+        try:
+            with open(self.path, encoding="utf-8") as file:
+                return datetime.fromisoformat(json.load(file)["fed_at"])
+        except (OSError, ValueError, KeyError, TypeError):
+            return None
+
+    def save_fed_at(self, fed_at):
+        try:
+            os.makedirs(os.path.dirname(self.path), exist_ok=True)
+            with open(self.path, "w", encoding="utf-8") as file:
+                json.dump({"fed_at": fed_at.isoformat()}, file)
+        except OSError:
+            pass
+
+    def clear(self):
+        try:
+            os.remove(self.path)
+        except OSError:
+            pass
+
+
 class FeedingTimerApp:
-    def __init__(self, root):
+    def __init__(self, root, feeding_log):
         self.root = root
+        self.feeding_log = feeding_log
         self.text_images = {}
         self.load_images()
         self.setup_gui()
-        self.show_not_fed()
+        self.restore_last_feeding()
 
     def load_images(self):
         self.bg_image = load_image(AppConfig.BACKGROUND_IMAGE_PATH)
@@ -190,14 +229,26 @@ class FeedingTimerApp:
         self.make_clickable(self.undo_button, self.on_undo_click)
 
         icon_size = self.fullscreen_open_image.width()
-        self.fullscreen_button = self.create_button(width - icon_size - Layout.INLINE_GAP, Layout.INLINE_GAP,
+        self.fullscreen_button = self.create_button(width - icon_size - Layout.ICON_INSET, Layout.ICON_INSET,
                                                     self.fullscreen_open_image, self.on_fullscreen_click)
 
         self.not_fed_items = (self.bowl_hint, self.bowl_button)
         self.fed_items = (self.countdown_label, self.countdown_text, self.fed_at_text, self.undo_button)
 
-        self.countdown = MealCountdown(self.canvas, on_tick=self.show_remaining_time, on_finished=self.show_not_fed)
+        self.countdown = MealCountdown(self.canvas, on_tick=self.show_remaining_time, on_finished=self.on_countdown_finished)
         self.root.bind("<Escape>", self.on_escape)
+
+    def restore_last_feeding(self):
+        fed_at = self.feeding_log.load_fed_at()
+        if fed_at is not None and next_reset_time(fed_at) > datetime.now():
+            self.start_fed(fed_at)
+        else:
+            self.feeding_log.clear()
+            self.show_not_fed()
+
+    def start_fed(self, fed_at):
+        self.show_fed(fed_at)
+        self.countdown.start(next_reset_time(fed_at))
 
     def show_not_fed(self):
         self.set_text(self.title_text, NOT_FED_TITLE, Styles.TITLE)
@@ -217,11 +268,16 @@ class FeedingTimerApp:
 
     def on_bowl_click(self, event):
         fed_at = datetime.now()
-        self.show_fed(fed_at)
-        self.countdown.start(next_reset_time(fed_at))
+        self.feeding_log.save_fed_at(fed_at)
+        self.start_fed(fed_at)
 
     def on_undo_click(self, event):
         self.countdown.cancel()
+        self.feeding_log.clear()
+        self.show_not_fed()
+
+    def on_countdown_finished(self):
+        self.feeding_log.clear()
         self.show_not_fed()
 
     def on_fullscreen_click(self, event):
@@ -259,5 +315,5 @@ class FeedingTimerApp:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = FeedingTimerApp(root)
+    app = FeedingTimerApp(root, FeedingLog(state_file_path()))
     root.mainloop()
