@@ -224,28 +224,31 @@ class FeedingTimerApp:
         self.canvas.create_image(0, 0, anchor=tk.NW, image=self.bg_image)
 
         self.title_text = self.create_text(Layout.TITLE_Y)
-
-        self.bowl_hint = self.create_text(Layout.HINT_Y)
-        self.set_text(self.bowl_hint, BOWL_HINT, Styles.HINT)
-        self.bowl_button = self.create_button(Layout.MARGIN, Layout.BOWL_Y, self.bowl_image, self.on_bowl_click)
-
-        self.countdown_label = self.create_text(Layout.LABEL_Y)
-        self.set_text(self.countdown_label, COUNTDOWN_LABEL, Styles.LABEL)
-        self.countdown_text = self.create_text(Layout.COUNTDOWN_Y)
-        self.fed_at_text = self.create_text(Layout.DETAIL_Y)
-        self.undo_button = self.create_text(Layout.DETAIL_Y)
-        self.set_text(self.undo_button, UNDO_LABEL, Styles.LINK)
-        self.make_clickable(self.undo_button, self.on_undo_click)
+        self.not_fed_items = self.create_not_fed_view()
+        self.fed_items = self.create_fed_view()
 
         icon_size = self.fullscreen_open_image.width()
         self.fullscreen_button = self.create_button(width - icon_size - Layout.ICON_INSET, Layout.ICON_INSET,
                                                     self.fullscreen_open_image, self.on_fullscreen_click)
 
-        self.not_fed_items = (self.bowl_hint, self.bowl_button)
-        self.fed_items = (self.countdown_label, self.countdown_text, self.fed_at_text, self.undo_button)
-
         self.countdown = MealCountdown(self.canvas, on_tick=self.show_remaining_time, on_finished=self.show_not_fed)
         self.root.bind("<Escape>", self.on_escape)
+
+    def create_not_fed_view(self):
+        bowl_hint = self.create_text(Layout.HINT_Y)
+        self.set_text(bowl_hint, BOWL_HINT, Styles.HINT)
+        self.bowl_button = self.create_button(Layout.MARGIN, Layout.BOWL_Y, self.bowl_image, self.on_bowl_click)
+        return bowl_hint, self.bowl_button
+
+    def create_fed_view(self):
+        countdown_label = self.create_text(Layout.LABEL_Y)
+        self.set_text(countdown_label, COUNTDOWN_LABEL, Styles.LABEL)
+        self.countdown_text = self.create_text(Layout.COUNTDOWN_Y)
+        self.fed_at_text = self.create_text(Layout.DETAIL_Y)
+        self.undo_button = self.create_text(Layout.DETAIL_Y)
+        self.set_text(self.undo_button, UNDO_LABEL, Styles.LINK)
+        self.make_clickable(self.undo_button, self.on_undo_click)
+        return countdown_label, self.countdown_text, self.fed_at_text, self.undo_button
 
     def restore_last_feeding(self):
         fed_at = self.feeding_log.load_fed_at()
