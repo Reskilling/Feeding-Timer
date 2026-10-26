@@ -1,106 +1,122 @@
 import ctypes
+import os
 import sys
 import tkinter as tk
-from tkinter import messagebox
-from PIL import Image, ImageTk
 from datetime import datetime, timedelta
-import os
+from tkinter import messagebox
 
-if hasattr(sys, 'frozen'):
-    ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 0)
-    ctypes.windll.kernel32.SetConsoleTitleW("DogTimer")
+from PIL import Image, ImageTk
+
 
 class AppConfig:
+    APP_TITLE = "AnimalTimer"
+    PET_NAME = "Jake"
     BACKGROUND_IMAGE_PATH = "background.png"
     BOWL_IMAGE_PATH = "bowl.gif"
     FULLSCREEN_IMAGE_PATH_OPEN = "fullscreen_open.gif"
     FULLSCREEN_IMAGE_PATH_CLOSE = "fullscreen_close.gif"
+    WINDOW_SIZE = (800, 480)
     RESET_TIME_MORNING = (6, 0)
     RESET_TIME_EVENING = (16, 30)
     UPDATE_INTERVAL = 1000
     FONT_STYLE = ("Cooper Black", 24)
     TEXT_COLOR = "black"
 
-class ImageLoader:
-    @staticmethod
-    def load_image(image_path):
-        try:
-            img = Image.open(image_path)
-            img.photo = ImageTk.PhotoImage(img)
-            return img.photo
-        except OSError as e:
-            messagebox.showerror("DogTimer", f"Could not load image '{image_path}':\n{e}")
-            raise SystemExit(1)
 
-class TimerManager:
-    def __init__(self, canvas, display_label, bowl_button, timer_label):
+NOT_FED_MESSAGE = f"{AppConfig.PET_NAME} has not eaten. 😢"
+FED_MESSAGE = f"{AppConfig.PET_NAME} has been fed! 😀"
+
+
+def resource_path(relative_path):
+    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_path, relative_path)
+
+
+def load_image(relative_path):
+    image_path = resource_path(relative_path)
+    try:
+        return ImageTk.PhotoImage(Image.open(image_path))
+    except OSError as e:
+        messagebox.showerror(AppConfig.APP_TITLE, f"Could not load image '{image_path}':\n{e}")
+        raise SystemExit(1)
+
+
+def next_reset_time(now):
+    reset_time_morning = now.replace(hour=AppConfig.RESET_TIME_MORNING[0], minute=AppConfig.RESET_TIME_MORNING[1],
+                                     second=0, microsecond=0)
+    reset_time_evening = now.replace(hour=AppConfig.RESET_TIME_EVENING[0], minute=AppConfig.RESET_TIME_EVENING[1],
+                                     second=0, microsecond=0)
+
+    if now < reset_time_morning:
+        return reset_time_morning
+    if now < reset_time_evening:
+        return reset_time_evening
+    return reset_time_morning + timedelta(days=1)
+
+
+def format_countdown(remaining_time):
+    hours, remainder = divmod(int(remaining_time.total_seconds()), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02}:{minutes:02}:{seconds:02}"
+
+
+class FeedingTimer:
+    def __init__(self, canvas, status_text, bowl_button, countdown_text):
         self.canvas = canvas
-        self.display_label = display_label
+        self.status_text = status_text
         self.bowl_button = bowl_button
-        self.timer_label = timer_label
+        self.countdown_text = countdown_text
 
-    def start_timer(self):
-        end_time = self.calculate_next_reset_time()
-        self.update_timer(end_time)
+    def start(self):
+        self.tick(next_reset_time(datetime.now()))
 
-    def update_timer(self, end_time):
+    def tick(self, end_time):
         remaining_time = max(end_time - datetime.now(), timedelta(0))
-        hours, remainder = divmod(int(remaining_time.total_seconds()), 3600)
-        minutes, seconds = divmod(remainder, 60)
-        self.canvas.itemconfig(self.timer_label, text=f"{hours:02}:{minutes:02}:{seconds:02}")
+        self.canvas.itemconfig(self.countdown_text, text=format_countdown(remaining_time))
 
         if remaining_time > timedelta(0):
-            self.canvas.after(AppConfig.UPDATE_INTERVAL, lambda: self.update_timer(end_time))
+            self.canvas.after(AppConfig.UPDATE_INTERVAL, lambda: self.tick(end_time))
         else:
-            self.reset_timer_display()
+            self.reset_display()
 
-    def reset_timer_display(self):
-        self.canvas.itemconfig(self.display_label, text="Jake has not eaten. 😢")
-        self.canvas.itemconfig(self.timer_label, text="")
+    def reset_display(self):
+        self.canvas.itemconfig(self.status_text, text=NOT_FED_MESSAGE)
+        self.canvas.itemconfig(self.countdown_text, text="")
         self.canvas.itemconfig(self.bowl_button, state=tk.NORMAL)
 
-    def calculate_next_reset_time(self):
-        now = datetime.now()
-        reset_time_morning = datetime(now.year, now.month, now.day, *AppConfig.RESET_TIME_MORNING)
-        reset_time_evening = datetime(now.year, now.month, now.day, *AppConfig.RESET_TIME_EVENING)
 
-        if now < reset_time_morning:
-            return reset_time_morning
-        if now < reset_time_evening:
-            return reset_time_evening
-        return reset_time_morning + timedelta(days=1)
-
-class JakeTimerApp:
+class AnimalTimerApp:
     def __init__(self, root):
         self.root = root
-        self.load_images()  # Load images during initialization
+        self.load_images()
         self.setup_gui()
 
-    def setup_gui(self):
-        self.root.title("DogTimer")
+    def load_images(self):
+        self.bg_image = load_image(AppConfig.BACKGROUND_IMAGE_PATH)
+        self.bowl_image = load_image(AppConfig.BOWL_IMAGE_PATH)
+        self.fullscreen_open_image = load_image(AppConfig.FULLSCREEN_IMAGE_PATH_OPEN)
+        self.fullscreen_close_image = load_image(AppConfig.FULLSCREEN_IMAGE_PATH_CLOSE)
 
-        self.canvas = tk.Canvas(self.root, width=800, height=480, highlightthickness=0)
+    def setup_gui(self):
+        self.root.title(AppConfig.APP_TITLE)
+
+        width, height = AppConfig.WINDOW_SIZE
+        self.canvas = tk.Canvas(self.root, width=width, height=height, highlightthickness=0)
         self.canvas.pack()
         self.canvas.create_image(0, 0, anchor=tk.NW, image=self.bg_image)
 
-        self.display_label = self.create_text(200, 50, "Jake has not eaten. 😢", AppConfig.FONT_STYLE, AppConfig.TEXT_COLOR)
-        self.bowl_button = self.create_image(100, 75, self.bowl_image, self.on_bowl_click)
-        self.fullscreen_button = self.create_image(768, 0, self.fullscreen_open_image, self.on_fullscreen_click)
-        self.timer_label = self.create_text(175, 100, "", AppConfig.FONT_STYLE, AppConfig.TEXT_COLOR)
+        self.status_text = self.create_text(200, 50, NOT_FED_MESSAGE)
+        self.bowl_button = self.create_button(100, 75, self.bowl_image, self.on_bowl_click)
+        self.fullscreen_button = self.create_button(width - 32, 0, self.fullscreen_open_image, self.on_fullscreen_click)
+        self.countdown_text = self.create_text(175, 100, "")
 
-        self.timer_manager = TimerManager(self.canvas, self.display_label, self.bowl_button, self.timer_label)
+        self.feeding_timer = FeedingTimer(self.canvas, self.status_text, self.bowl_button, self.countdown_text)
         self.root.bind("<Escape>", self.on_escape)
 
-    def load_images(self):
-        self.bg_image = ImageLoader.load_image(resource_path(AppConfig.BACKGROUND_IMAGE_PATH))
-        self.bowl_image = ImageLoader.load_image(resource_path(AppConfig.BOWL_IMAGE_PATH))
-        self.fullscreen_open_image = ImageLoader.load_image(resource_path(AppConfig.FULLSCREEN_IMAGE_PATH_OPEN))
-        self.fullscreen_close_image = ImageLoader.load_image(resource_path(AppConfig.FULLSCREEN_IMAGE_PATH_CLOSE))
-
     def on_bowl_click(self, event):
-        self.canvas.itemconfig(self.display_label, text="Jake has been fed! 😀")
+        self.canvas.itemconfig(self.status_text, text=FED_MESSAGE)
         self.canvas.itemconfig(self.bowl_button, state=tk.HIDDEN)
-        self.timer_manager.start_timer()
+        self.feeding_timer.start()
 
     def on_fullscreen_click(self, event):
         self.set_fullscreen(not self.root.attributes('-fullscreen'))
@@ -113,21 +129,23 @@ class JakeTimerApp:
         img = self.fullscreen_close_image if enabled else self.fullscreen_open_image
         self.canvas.itemconfig(self.fullscreen_button, image=img)
 
-    def create_text(self, x, y, text, font, fill):
-        return self.canvas.create_text(x, y, text=text, font=font, fill=fill)
+    def create_text(self, x, y, text):
+        return self.canvas.create_text(x, y, text=text, font=AppConfig.FONT_STYLE, fill=AppConfig.TEXT_COLOR)
 
-    def create_image(self, x, y, image, click_handler=None):
-        image_widget = self.canvas.create_image(x, y, anchor=tk.NW, image=image)
-        if click_handler:
-            self.canvas.tag_bind(image_widget, "<Button-1>", click_handler)
-        return image_widget
+    def create_button(self, x, y, image, click_handler):
+        button = self.canvas.create_image(x, y, anchor=tk.NW, image=image)
+        self.canvas.tag_bind(button, "<Button-1>", click_handler)
+        return button
 
-def resource_path(relative_path):
-    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
 
-    return os.path.join(base_path, relative_path)
+def hide_frozen_console():
+    ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 0)
+    ctypes.windll.kernel32.SetConsoleTitleW(AppConfig.APP_TITLE)
+
 
 if __name__ == "__main__":
+    if hasattr(sys, 'frozen'):
+        hide_frozen_console()
     root = tk.Tk()
-    app = JakeTimerApp(root)
+    app = AnimalTimerApp(root)
     root.mainloop()
