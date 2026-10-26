@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from AnimalTimer import format_countdown, next_reset_time
+from feeding_timer import format_clock_time, format_countdown, next_reset_time
 
 
 class NextResetTimeTest(unittest.TestCase):
@@ -27,13 +27,21 @@ class NextResetTimeTest(unittest.TestCase):
 
 class FormatCountdownTest(unittest.TestCase):
     def test_formats_hours_minutes_seconds(self):
-        self.assertEqual(format_countdown(timedelta(hours=1, minutes=2, seconds=3)), "Next meal in 01:02:03")
+        self.assertEqual(format_countdown(timedelta(hours=1, minutes=2, seconds=3)), "1:02:03")
 
     def test_does_not_wrap_past_a_day(self):
-        self.assertEqual(format_countdown(timedelta(hours=25)), "Next meal in 25:00:00")
+        self.assertEqual(format_countdown(timedelta(hours=25)), "25:00:00")
 
     def test_zero(self):
-        self.assertEqual(format_countdown(timedelta(0)), "Next meal in 00:00:00")
+        self.assertEqual(format_countdown(timedelta(0)), "0:00:00")
+
+
+class FormatClockTimeTest(unittest.TestCase):
+    def test_drops_leading_zero_from_hour(self):
+        self.assertEqual(format_clock_time(datetime(2026, 10, 26, 7, 5)), "7:05 AM")
+
+    def test_afternoon_uses_pm(self):
+        self.assertEqual(format_clock_time(datetime(2026, 10, 26, 16, 30)), "4:30 PM")
 
 
 if __name__ == "__main__":

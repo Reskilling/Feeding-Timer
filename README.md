@@ -1,6 +1,6 @@
-# AnimalTimer
+# Feeding-Timer
 
-AnimalTimer is a small desktop app that shows whether your pet has been fed and
+Feeding-Timer is a small desktop app that shows whether your pet has been fed and
 counts down to the next meal. Tap the bowl after feeding, and the app shows a
 countdown until the next feeding window starts. The app uses a fixed 800×480
 window that you can switch to fullscreen.
@@ -8,7 +8,7 @@ window that you can switch to fullscreen.
 This README is for anyone who wants to run the app from source or adapt it for
 their own pet.
 
-![AnimalTimer before feeding: the message "Jake has not eaten" above a food bowl and the hint "Tap the bowl after feeding".](docs/screenshot.png)
+![Feeding-Timer after feeding: "Jake has been fed" with a countdown to the next meal, the feeding time, and an Undo link.](docs/screenshot.png)
 
 ## Requirements
 
@@ -42,22 +42,22 @@ their own pet.
 To start the app, run the following command:
 
 ```sh
-python AnimalTimer.py
+python feeding_timer.py
 ```
 
-The window shows "Jake has not eaten." and a food bowl.
+The window shows "Time to feed Jake" and a food bowl.
 
 ## Record a feeding
 
 1. After you feed your pet, tap the bowl.
 
-   The message changes to "Jake has been fed!", and a countdown shows the time
-   until the next meal.
+   The title changes to "Jake has been fed", and the app shows a countdown to
+   the next meal and the time you fed your pet.
 
 2. Optional: If you tapped the bowl by mistake, tap **Undo**.
 
-When the countdown reaches zero, the bowl reappears and the app shows that your
-pet hasn't eaten.
+When the countdown reaches zero, the app returns to "Time to feed Jake" and the
+bowl reappears.
 
 The countdown ends at the next feeding window:
 
@@ -77,21 +77,22 @@ the "not eaten" state.
 
 ## Customize the app
 
-To change the app's behavior, edit the `AppConfig` class in `AnimalTimer.py`.
+To change the app's behavior, edit the `AppConfig` class in `feeding_timer.py`.
 The following settings are available:
 
 | Setting | Description | Default |
 |---|---|---|
 | `PET_NAME` | The name shown in the status messages. | `"Jake"` |
-| `APP_TITLE` | The window title. | `"AnimalTimer"` |
+| `APP_TITLE` | The window title. | `"Feeding-Timer"` |
 | `RESET_TIME_MORNING` | The start of the morning feeding window, as `(hour, minute)`. | `(6, 0)` |
 | `RESET_TIME_EVENING` | The start of the evening feeding window, as `(hour, minute)`. | `(16, 30)` |
 | `WINDOW_SIZE` | The window size in pixels, as `(width, height)`. Match it to your background image. | `(800, 480)` |
 | `UPDATE_INTERVAL` | How often the countdown refreshes, in milliseconds. | `1000` |
-| `FONT_STYLE` | The font for the status message. | `("Cooper Black", 24)` |
-| `TEXT_COLOR` | The color of all text. | `"black"` |
 
-To use your own artwork, replace `background.png` and `bowl.gif`.
+To change text sizes, weights, or colors, edit the `Styles` class. To move
+text, edit the `Layout` class.
+
+To use your own artwork, replace `assets/background.png` and `assets/bowl.gif`.
 
 ## Run the tests
 
@@ -105,3 +106,7 @@ python -m unittest discover -s tests
 
 This project is licensed under the MIT License. For details, see
 [LICENSE](LICENSE).
+
+The app bundles the [Nunito](https://github.com/googlefonts/nunito) font, which
+is licensed under the SIL Open Font License 1.1. For details, see
+[assets/fonts/OFL.txt](assets/fonts/OFL.txt).
