@@ -1,4 +1,3 @@
-import ctypes
 import os
 import sys
 import tkinter as tk
@@ -169,6 +168,7 @@ class FeedingTimerApp:
     def setup_gui(self):
         self.root.title(AppConfig.APP_TITLE)
         self.root.resizable(False, False)
+        self.root.iconphoto(True, self.bowl_image)
 
         width, height = AppConfig.WINDOW_SIZE
         self.canvas = tk.Canvas(self.root, width=width, height=height, highlightthickness=0)
@@ -257,14 +257,7 @@ class FeedingTimerApp:
         self.canvas.tag_bind(item, "<Leave>", lambda event: self.canvas.config(cursor=""))
 
 
-def hide_frozen_console():
-    ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 0)
-    ctypes.windll.kernel32.SetConsoleTitleW(AppConfig.APP_TITLE)
-
-
 if __name__ == "__main__":
-    if hasattr(sys, 'frozen'):
-        hide_frozen_console()
     root = tk.Tk()
     app = FeedingTimerApp(root)
     root.mainloop()

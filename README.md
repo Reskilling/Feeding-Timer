@@ -10,6 +10,14 @@ their own pet.
 
 ![Feeding-Timer after feeding: "Jake has been fed" with a countdown to the next meal, the feeding time, and an Undo link.](docs/screenshot.png)
 
+## Download for Windows
+
+To run the app without installing Python, download `Feeding-Timer.exe` from the
+[latest release](https://github.com/Reskilling/Feeding-Timer/releases/latest)
+and open it.
+
+The rest of this README covers running the app from source.
+
 ## Requirements
 
 - Python 3.6 or later, with Tkinter. Tkinter is included with the standard
@@ -101,6 +109,23 @@ To run the unit tests, run the following command from the project directory:
 ```sh
 python -m unittest discover -s tests
 ```
+
+## Build the Windows executable
+
+1. Install PyInstaller:
+
+   ```sh
+   pip install pyinstaller
+   ```
+
+2. From the project directory, run the build script in PowerShell:
+
+   ```powershell
+   ./build.ps1
+   ```
+
+The script creates `dist/Feeding-Timer.exe`, a single file that includes the
+images and font.
 
 ## License
 
